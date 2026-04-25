@@ -1,16 +1,21 @@
-# React + Vite
+# Orders App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Local Dev
+`npm run dev`
+API: http://localhost/orders-app/server/api.php
 
-Currently, two official plugins are available:
+## Gh-Pages Deploy
+1. Update package.json homepage with your GitHub username.
+2. `git init git remote add origin git@github.com:yourusername/orders-app.git`
+3. `npm run deploy-gh`
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Capacitor Android
+1. `npm i @capacitor/core @capacitor/android @capacitor/cli`
+2. `npx cap add android`
+3. `npx cap sync`
+4. `npx cap open android`
 
-## React Compiler
+Update capacitor.config.ts server.url with your IP.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Env
+Copy .env.example → .env with VITE_API_URL=your-prod-api
