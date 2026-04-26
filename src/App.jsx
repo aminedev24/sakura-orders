@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import AdminForm from './components/AdminForm';
 import OrderForm from './components/OrderForm';
 import AdminCard from './components/AdminCard';
-import { fetchAdmins, addAdmin, addOrder } from './api/api';
+import { fetchAdmins, addAdmin, addOrder, updateAdmin, deleteAdmin, updateOrder, deleteOrder } from './api/api';
 
 function App() {
   const [admins, setAdmins] = useState([]); 
@@ -11,6 +11,8 @@ function App() {
   const [error, setError] = useState(null);
   const [adminSearch, setAdminSearch] = useState('');
   const [adminViewMode, setAdminViewMode] = useState('all'); 
+  const [editingOrder, setEditingOrder] = useState(null);
+  const orderFormRef = useRef(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -20,7 +22,7 @@ function App() {
       setError(null);
     } catch (err) {
       console.error('Error fetching data:', err);
-      setError('فشل في تحميل البيانات. يرجى المحاولة لاحقاً.');
+      setError(err.message || 'فشل في تحميل البيانات. يرجى المحاولة لاحقاً.');
     } finally {
       setLoading(false);
     }
@@ -41,6 +43,30 @@ function App() {
     }
   };
 
+  const handleUpdateAdmin = async (id, name) => {
+    try {
+      const result = await updateAdmin(id, name);
+      if (result.success) {
+        loadData();
+      }
+    } catch (err) {
+      alert('حدث خطأ أثناء تعديل الأدمن');
+    }
+  };
+
+  const handleDeleteAdmin = async (id) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا الأدمن وجميع طلبياته؟')) {
+      try {
+        const result = await deleteAdmin(id);
+        if (result.success) {
+          loadData();
+        }
+      } catch (err) {
+        alert('حدث خطأ أثناء حذف الأدمن');
+      }
+    }
+  };
+
   const handleAddOrder = async (orderData) => {
     try {
       const result = await addOrder(orderData);
@@ -52,9 +78,43 @@ function App() {
     }
   };
 
-  const filteredAdmins = admins
-    .filter(admin => admin.name.includes(adminSearch))
-    .filter(admin => adminViewMode === 'all' || admin.id === parseInt(adminViewMode));
+  const handleUpdateOrder = async (orderData) => {
+    try {
+      const result = await updateOrder(orderData);
+      if (result.success) {
+        setEditingOrder(null);
+        loadData();
+      }
+    } catch (err) {
+      alert('حدث خطأ أثناء تعديل الطلبية');
+    }
+  };
+
+  const handleDeleteOrder = async (id) => {
+    if (window.confirm('هل أنت متأكد من حذف هذه الطلبية؟')) {
+      try {
+        const result = await deleteOrder(id);
+        if (result.success) {
+          loadData();
+        }
+      } catch (err) {
+        alert('حدث خطأ أثناء حذف الطلبية');
+      }
+    }
+  };
+
+  const handleEditOrder = (order) => {
+    setEditingOrder(order);
+    if (orderFormRef.current) {
+      orderFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const filteredAdmins = Array.isArray(admins) 
+    ? admins
+      .filter(admin => admin.name.includes(adminSearch))
+      .filter(admin => adminViewMode === 'all' || admin.id === parseInt(adminViewMode))
+    : [];
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-10 font-sans selection:bg-blue-200" dir="rtl">
@@ -76,8 +136,14 @@ function App() {
 
         <AdminForm onAddAdmin={handleAddAdmin} />
         
-        <div className="mt-4">
-          <OrderForm admins={admins} onAddOrder={handleAddOrder} />
+        <div className="mt-4" ref={orderFormRef}>
+          <OrderForm 
+            admins={admins} 
+            onAddOrder={handleAddOrder} 
+            onUpdateOrder={handleUpdateOrder}
+            editingOrder={editingOrder}
+            setEditingOrder={setEditingOrder}
+          />
         </div>
 
         {loading ? (
@@ -93,7 +159,14 @@ function App() {
               </div>
             ) : (
               filteredAdmins.map(admin => (
-                <AdminCard key={admin.id} admin={admin} />
+                <AdminCard 
+                  key={admin.id} 
+                  admin={admin} 
+                  onUpdateAdmin={handleUpdateAdmin}
+                  onDeleteAdmin={handleDeleteAdmin}
+                  onEditOrder={handleEditOrder}
+                  onDeleteOrder={handleDeleteOrder}
+                />
               ))
             )}
           </div>
