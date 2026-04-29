@@ -1,26 +1,41 @@
 import React, { useState, useMemo } from 'react';
+import ReturnModal from './ReturnModal';
 
-const AdminCard = ({ admin, onUpdateAdmin, onDeleteAdmin, onEditOrder, onDeleteOrder }) => {
+const AdminCard = ({ admin, onUpdateAdmin, onDeleteAdmin, onEditOrder, onDeleteOrder, onReturnOrder }) => {
   const [viewMode, setViewMode] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(admin.name);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [selectedOrderForReturn, setSelectedOrderForReturn] = useState(null);
   const itemsPerPage = 5;
 
-  const totals = useMemo(() => admin.orders.reduce((acc, order) => {
-    acc.admin += (order.admin_profit || 0);
-    acc.marketer += (order.marketer_profit || 0);
-    acc.mine += (order.my_profit || 0);
-    return acc;
-  }, { admin: 0, marketer: 0, mine: 0 }), [admin.orders]);
+  const totals = useMemo(() => {
+    const orders = admin.orders || [];
+    // Returned orders are already removed from the orders array in the database,
+    // so summing active orders automatically 'deducts' the returned ones.
+    return orders.reduce((acc, order) => {
+      acc.admin += (order.admin_profit || 0);
+      acc.marketer += (order.marketer_profit || 0);
+      acc.mine += (order.my_profit || 0);
+      return acc;
+    }, { admin: 0, marketer: 0, mine: 0 });
+  }, [admin.orders]);
 
-  const uniqueMarketers = useMemo(() => [...new Set(admin.orders.map(o => o.marketer_name))], [admin.orders]);
+  const uniqueMarketers = useMemo(() => [...new Set((admin.orders || []).map(o => o.marketer_name))], [admin.orders]);
 
   const filteredOrders = useMemo(() => {
-    if (viewMode === 'all') return admin.orders;
-    return admin.orders.filter(o => o.marketer_name === viewMode);
+    const orders = admin.orders || [];
+    if (viewMode === 'all') return orders;
+    return orders.filter(o => o.marketer_name === viewMode);
   }, [admin.orders, viewMode]);
+
+  const filteredReturns = useMemo(() => {
+    const returns = admin.returns || [];
+    if (viewMode === 'all') return returns;
+    return returns.filter(r => r.marketer_name === viewMode);
+  }, [admin.returns, viewMode]);
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const currentOrders = filteredOrders.slice(
@@ -41,8 +56,36 @@ const AdminCard = ({ admin, onUpdateAdmin, onDeleteAdmin, onEditOrder, onDeleteO
     setIsEditingName(false);
   };
 
+  const openReturnModal = (order) => {
+    setSelectedOrderForReturn(order);
+    setIsReturnModalOpen(true);
+  };
+
+  const confirmReturn = () => {
+    if (selectedOrderForReturn) {
+      onReturnOrder({
+        orderId: selectedOrderForReturn.id,
+        adminId: admin.id,
+        marketerName: selectedOrderForReturn.marketer_name,
+        details: selectedOrderForReturn.details,
+        myProfit: selectedOrderForReturn.my_profit,
+        adminProfit: selectedOrderForReturn.admin_profit,
+        marketerProfit: selectedOrderForReturn.marketer_profit
+      });
+    }
+    setIsReturnModalOpen(false);
+    setSelectedOrderForReturn(null);
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden mb-8">
+      <ReturnModal 
+        isOpen={isReturnModalOpen}
+        onClose={() => setIsReturnModalOpen(false)}
+        onConfirm={confirmReturn}
+        order={selectedOrderForReturn}
+      />
+      
       <div 
         className="p-5 bg-gray-50 border-b flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 cursor-pointer hover:bg-gray-100 transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
@@ -122,6 +165,7 @@ const AdminCard = ({ admin, onUpdateAdmin, onDeleteAdmin, onEditOrder, onDeleteO
           </div>
 
           <div className="overflow-x-auto">
+            <h3 className="p-4 bg-gray-50 font-bold text-gray-700 border-b">الطلبيات النشطة</h3>
             <table className="w-full text-right border-collapse min-w-[700px]">
               <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
                 <tr>
@@ -130,6 +174,7 @@ const AdminCard = ({ admin, onUpdateAdmin, onDeleteAdmin, onEditOrder, onDeleteO
                   <th className="p-4 border-b text-purple-700">فائدتي</th>
                   <th className="p-4 border-b text-green-700">فائدة الأدمن</th>
                   <th className="p-4 border-b text-blue-700">فائدة المسوقة</th>
+                  <th className="p-4 border-b text-xs">التاريخ</th>
                   <th className="p-4 border-b text-center">الإجراءات</th>
                 </tr>
               </thead>
@@ -141,8 +186,18 @@ const AdminCard = ({ admin, onUpdateAdmin, onDeleteAdmin, onEditOrder, onDeleteO
                     <td className="p-4 font-mono font-bold text-purple-600">+{order.my_profit}</td>
                     <td className="p-4 font-mono font-bold text-green-600">+{order.admin_profit}</td>
                     <td className="p-4 font-mono font-bold text-blue-600">+{order.marketer_profit}</td>
+                    <td className="p-4 text-xs text-gray-400">{order.created_at}</td>
                     <td className="p-4 text-center">
                       <div className="flex justify-center gap-2">
+                        <button 
+                          onClick={() => openReturnModal(order)}
+                          className="p-1 text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                          title="إرجاع الطلبية"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                          </svg>
+                        </button>
                         <button 
                           onClick={() => onEditOrder(order)}
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -165,21 +220,45 @@ const AdminCard = ({ admin, onUpdateAdmin, onDeleteAdmin, onEditOrder, onDeleteO
                     </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan="6" className="p-6 text-center text-gray-400">لا توجد طلبيات</td></tr>
+                  <tr><td colSpan="7" className="p-6 text-center text-gray-400">لا توجد طلبيات</td></tr>
                 )}
-                </tbody>
-                <tfoot className="bg-gray-100 font-bold border-t">
+              </tbody>
+            </table>
+          </div>
+
+          {filteredReturns.length > 0 && (
+            <div className="overflow-x-auto border-t">
+              <h3 className="p-4 bg-orange-50 font-bold text-orange-700 border-b">سجل المرجوعات</h3>
+              <table className="w-full text-right border-collapse min-w-[700px]">
+                <thead className="bg-orange-50 text-orange-600 uppercase text-xs">
                   <tr>
-                    <td className="p-4 text-left">المجموع</td>
-                    <td className="p-4"></td>
-                    <td className="p-4 text-purple-700">{filteredOrders.reduce((sum, o) => sum + (o.my_profit || 0), 0).toLocaleString()} د.ج</td>
-                    <td className="p-4 text-green-700">{filteredOrders.reduce((sum, o) => sum + (o.admin_profit || 0), 0).toLocaleString()} د.ج</td>
-                    <td className="p-4 text-blue-700">{filteredOrders.reduce((sum, o) => sum + (o.marketer_profit || 0), 0).toLocaleString()} د.ج</td>
-                    <td className="p-4"></td>
+                    <th className="p-4 border-b">المسوقة</th>
+                    <th className="p-4 border-b">الطلبية المرجوعة</th>
+                    <th className="p-4 border-b text-purple-700">فائدتي</th>
+                    <th className="p-4 border-b text-green-700">فائدة الأدمن</th>
+                    <th className="p-4 border-b text-red-600">خصم المسوقة</th>
+                    <th className="p-4 border-b text-xs">التاريخ</th>
                   </tr>
-                </tfoot>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredReturns.map(ret => (
+                    <tr key={ret.id} className="hover:bg-orange-50 transition-colors">
+                      <td className="p-4 font-bold text-gray-800">{ret.marketer_name}</td>
+                      <td className="p-4 text-gray-600">{ret.details}</td>
+                      <td className="p-4 text-purple-400 line-through font-mono text-xs">
+                        {ret.my_profit.toLocaleString()} (خصمت)
+                      </td>
+                      <td className="p-4 text-green-400 line-through font-mono text-xs">
+                        {ret.admin_profit.toLocaleString()} (خصمت)
+                      </td>
+                      <td className="p-4 font-mono font-bold text-red-600">-{ret.marketer_profit}</td>
+                      <td className="p-4 text-xs text-gray-500">{ret.created_at}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
+          )}
 
           {totalPages > 1 && (
             <div className="p-4 bg-gray-50 border-t flex justify-between items-center">

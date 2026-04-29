@@ -93,3 +93,16 @@ export const deleteOrder = async (id) => {
   }
   return res.json();
 };
+
+export const addReturn = async (returnData) => {
+  const res = await fetch(`${API_BASE}/api.php?action=add_return`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(returnData)
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to add return');
+  }
+  return res.json();
+};
